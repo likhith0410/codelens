@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CodeLens — Codebase Q&A with Proof</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <span class="nav-logo">⟨/⟩</span>
+      <span class="nav-name">CodeLens</span>
+    </div>
+    <div class="nav-links">
+      <a href="/status" class="nav-link">System Status</a>
+      <span id="nav-session-badge" class="session-badge hidden"></span>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-bg-grid"></div>
+    <div class="hero-content">
+      <div class="hero-tag">AI-Powered Code Intelligence</div>
+      <h1 class="hero-title">
+        Understand any<br />
+        <span class="hero-accent">codebase</span><br />
+        in seconds.
+      </h1>
+      <p class="hero-sub">
+        Upload a ZIP or connect a GitHub repo. Ask questions in plain English.
+        Get precise answers with file paths, line numbers, and code snippets.
+      </p>
+      <div class="hero-steps">
+        <div class="step">
+          <span class="step-num">01</span>
+          <span class="step-text">Upload codebase</span>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <span class="step-num">02</span>
+          <span class="step-text">Ask a question</span>
+        </div>
+        <div class="step-arrow">→</div>
+        <div class="step">
+          <span class="step-num">03</span>
+          <span class="step-text">Get proof</span>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">
+        Start Exploring →
+      </button>
+    </div>
+    <div class="hero-terminal" aria-hidden="true">
+      <div class="terminal-bar"><span></span><span></span><span></span></div>
+      <div class="terminal-body">
+        <div class="t-line"><span class="t-prompt">$</span>&nbsp;Where is auth handled?</div>
+        <div class="t-line t-answer">→ <span class="t-file">src/middleware/auth.py</span> (lines 12–45)</div>
+        <div class="t-line t-dim">&nbsp;&nbsp;JWT validation, token refresh logic</div>
+        <div class="t-line t-answer">→ <span class="t-file">src/routes/login.py</span> (lines 8–31)</div>
+        <div class="t-line t-dim">&nbsp;&nbsp;POST /auth/login handler</div>
+        <div class="t-line t-blink">▋</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main App -->
+  <main class="app-main" id="app">
+
+    <!-- Panel 1: Load Codebase -->
+    <section class="panel" id="panel-ingest">
+      <div class="panel-header">
+        <span class="panel-num">01</span>
+        <h2 class="panel-title">Load Codebase</h2>
+        <span class="panel-subtitle">ZIP file or GitHub URL</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="ingest-tabs">
+          <button class="tab-btn active" data-tab="zip">📦 Upload ZIP</button>
+          <button class="tab-btn" data-tab="github">🔗 GitHub URL</button>
+        </div>
+
+        <!-- ZIP Tab -->
+        <div class="tab-content active" id="tab-zip">
+          <!--
+            FIX: The file input is outside the dropzone div.
+            The dropzone click calls input.click() directly.
+            No <label> inside the dropzone to avoid double-trigger.
+          -->
+          <input type="file" id="file-input" accept=".zip" style="display:none" />
+          <div class="dropzone" id="dropzone">
+            <div class="dropzone-icon">⬆</div>
+            <p class="dropzone-text">
+              Drop your <code>.zip</code> here or
+              <span class="file-label" onclick="document.getElementById('file-input').click()">browse</span>
+            </p>
+            <p class="dropzone-hint">Max 50 MB · Python, JS, TS, Go, Java, Ruby, Rust, and more</p>
+          </div>
+        </div>
+
+        <!-- GitHub Tab -->
+        <div class="tab-content" id="tab-github">
+          <div class="input-group">
+            <input
+              type="text"
+              id="github-url"
+              class="text-input"
+              placeholder="https://github.com/owner/repo"
+              autocomplete="off"
+            />
+            <button class="btn-primary" id="btn-github" onclick="loadGithub()">Load Repo</button>
+          </div>
+          <p class="hint-text">Public repositories only. Max 50 MB.</p>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="ingest-status hidden" id="ingest-status">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+          </div>
+          <p class="status-text" id="status-text">Processing…</p>
+        </div>
+
+        <!-- Success card -->
+        <div class="hidden" id="ingest-success">
+          <div class="success-card">
+            <div class="success-icon">✓</div>
+            <div class="success-info">
+              <p class="success-title" id="success-source"></p>
+              <p class="success-stats" id="success-stats"></p>
+            </div>
+            <button class="btn-ghost" onclick="resetSession()">Change ×</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Panel 2: Ask -->
+    <section class="panel hidden" id="panel-ask">
+      <div class="panel-header">
+        <span class="panel-num">02</span>
+        <h2 class="panel-title">Ask a Question</h2>
+        <span class="panel-subtitle">Plain English — be specific</span>
+      </div>
+      <div class="panel-body">
+        <div class="ask-suggestions">
+          <span class="suggestions-label">Try:</span>
+          <button class="suggestion-chip" onclick="fillQuestion(this)">Where is auth handled?</button>
+          <button class="suggestion-chip" onclick="fillQuestion(this)">How do retries work?</button>
+          <button class="suggestion-chip" onclick="fillQuestion(this)">What does the main entry point do?</button>
+          <button class="suggestion-chip" onclick="fillQuestion(this)">How is the database connected?</button>
+        </div>
+        <textarea
+          id="question-input"
+          class="question-textarea"
+          placeholder="e.g. Where is authentication handled? How does error logging work?"
+          rows="3"
+        ></textarea>
+        <div class="ask-actions">
+          <label class="toggle-label">
+            <input type="checkbox" id="refactor-toggle" />
+            <span class="toggle-track"></span>
+            <span>Suggest refactors</span>
+          </label>
+          <button class="btn-primary" id="btn-ask" onclick="askQuestion()">
+            <span id="ask-btn-text">Ask →</span>
+            <span id="ask-spinner" class="spinner hidden"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 3: Answer -->
+    <section class="panel hidden" id="panel-answer">
+      <div class="panel-header">
+        <span class="panel-num">03</span>
+        <h2 class="panel-title">Answer</h2>
+        <span class="panel-subtitle" id="answer-question-label"></span>
+      </div>
+      <div class="panel-body">
+        <div class="answer-content" id="answer-content"></div>
+
+        <div id="snippets-section" class="snippets-section hidden">
+          <div class="snippets-header">
+            <h3 class="snippets-title">Referenced Code</h3>
+            <span class="snippets-count" id="snippets-count"></span>
+          </div>
+          <div id="snippets-list"></div>
+        </div>
+
+        <div id="refactor-section" class="refactor-section hidden">
+          <div class="refactor-header">
+            <span>⚡</span>
+            <h3>Refactor Suggestions</h3>
+          </div>
+          <div id="refactor-content" class="refactor-content"></div>
+        </div>
+
+        <div class="tags-row" id="tags-row">
+          <span class="tags-label">Tags:</span>
+          <div class="tags-container" id="tags-container"></div>
+          <input type="text" id="tag-input" class="tag-input" placeholder="add tag…"
+                 onkeydown="if(event.key==='Enter') addTag()" />
+          <button class="btn-ghost btn-sm" onclick="addTag()">+</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section class="panel hidden" id="panel-history">
+      <div class="panel-header">
+        <span class="panel-num">↺</span>
+        <h2 class="panel-title">History</h2>
+        <div class="history-actions">
+          <input type="text" id="history-search" class="history-search-input"
+                 placeholder="Search history…" oninput="onHistorySearch(this.value)" />
+          <button class="btn-ghost btn-sm" onclick="exportSession()">Export MD</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="history-list" class="history-list">
+          <div class="history-empty">No Q&amp;As yet. Ask your first question above!</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>CodeLens — Built with FastAPI, Gemini &amp; ❤</span>
+    <a href="/status" class="footer-link">System Status</a>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
