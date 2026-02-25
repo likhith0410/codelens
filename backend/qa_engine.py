@@ -1,5 +1,10 @@
 """
-qa_engine.py — Q&A using gemini-embedding-001 retrieval + Gemini 1.5 Flash generation.
+qa_engine.py — Q&A using gemini-embedding-001 retrieval + Gemini Flash generation.
+
+Model name format for google-generativeai 0.8.3:
+  SDK 0.8.x uses v1beta API. Correct model string is "models/gemini-1.5-flash"
+  with the "models/" prefix, OR use the new stable name "gemini-1.5-flash-latest".
+  Confirmed working names for 0.8.x: "gemini-1.5-flash-latest", "gemini-1.5-pro-latest"
 """
 
 import os
@@ -13,7 +18,8 @@ from .indexer import CodebaseIndexer
 
 logger = logging.getLogger("codelens.qa")
 
-GEMINI_MODEL = "gemini-1.5-flash"   # confirmed free tier, matches health check
+# "gemini-1.5-flash-latest" resolves correctly in SDK 0.8.x / v1beta API
+GEMINI_MODEL = "gemini-1.5-flash-latest"
 
 
 class QAEngine:
@@ -94,22 +100,22 @@ class QAEngine:
             refactor = r.text.strip()
 
         return {
-            "answer":              answer_text,
-            "snippets":            [{**c, "language": _lang(c["file"])} for c in chunks],
+            "answer":               answer_text,
+            "snippets":             [{**c, "language": _lang(c["file"])} for c in chunks],
             "refactor_suggestions": refactor,
         }
 
 
 def _lang(filename: str) -> str:
     ext_map = {
-        ".py": "python",  ".js": "javascript", ".ts": "typescript",
-        ".jsx": "jsx",    ".tsx": "tsx",        ".java": "java",
-        ".go": "go",      ".rb": "ruby",        ".rs": "rust",
-        ".cpp": "cpp",    ".c": "c",            ".h": "c",
-        ".hpp": "cpp",    ".cs": "csharp",      ".php": "php",
-        ".swift": "swift",".kt": "kotlin",      ".sh": "bash",
-        ".bash": "bash",  ".yml": "yaml",       ".yaml": "yaml",
-        ".toml": "toml",  ".json": "json",      ".sql": "sql",
-        ".html": "html",  ".css": "css",        ".md": "markdown",
+        ".py": "python",   ".js": "javascript", ".ts": "typescript",
+        ".jsx": "jsx",     ".tsx": "tsx",        ".java": "java",
+        ".go": "go",       ".rb": "ruby",        ".rs": "rust",
+        ".cpp": "cpp",     ".c": "c",            ".h": "c",
+        ".hpp": "cpp",     ".cs": "csharp",      ".php": "php",
+        ".swift": "swift", ".kt": "kotlin",      ".sh": "bash",
+        ".bash": "bash",   ".yml": "yaml",       ".yaml": "yaml",
+        ".toml": "toml",   ".json": "json",      ".sql": "sql",
+        ".html": "html",   ".css": "css",        ".md": "markdown",
     }
     return ext_map.get(Path(filename).suffix.lower(), "text")

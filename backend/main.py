@@ -184,7 +184,7 @@ async def health():
             import google.generativeai as genai
             genai.configure(api_key=key)
             next(iter(genai.list_models()), None)
-            llm = {"status": "ok", "message": "Gemini connected (gemini-1.5-flash + gemini-embedding-001)"}
+            llm = {"status": "ok", "message": "Gemini connected (gemini-1.5-flash-latest + gemini-embedding-001)"}
         except Exception as e:
             logger.error('"event":"gemini_ping_failed","error":"%s"', str(e)[:120])
             llm = {"status": "error", "message": str(e)[:120]}
