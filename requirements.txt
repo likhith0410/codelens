@@ -4,14 +4,15 @@ uvicorn[standard]==0.29.0
 python-multipart==0.0.9
 httpx==0.27.0
 
-# ── Rate limiting ──────────────────────────────────────────────────────────────
+# ── Rate limiting ─────────────────────────────────────────────────────────────
 slowapi==0.1.9
 
-# ── Google Gemini — LLM + Embeddings (both free tier) ─────────────────────────
-google-generativeai==0.7.2
+# ── Google Gemini — LLM + Embeddings (both free tier) ────────────────────────
+# v0.8.3 supports Python 3.11 (pinned via .python-version)
+google-generativeai==0.8.3
 
-# ── Numeric — cosine similarity search ────────────────────────────────────────
-numpy>=2.0.0
+# ── Numeric — cosine similarity search ───────────────────────────────────────
+numpy>=1.26.0,<3.0.0
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
