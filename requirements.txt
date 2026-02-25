@@ -1,15 +1,17 @@
-# ── Web framework ──────────────────────────────────────────────────────────────
+# ── Web framework ─────────────────────────────────────────────────────────────
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 python-multipart==0.0.9
 httpx==0.27.0
 
-# ── Google Gemini — LLM (gemini-1.5-flash) + Embeddings (embedding-001) ────────
-# Works on Python 3.13 Windows without any C compiler.
-google-generativeai==0.8.3
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+slowapi==0.1.9
 
-# ── Numeric — for cosine similarity search (replaces FAISS) ────────────────────
+# ── Google Gemini — LLM + Embeddings (both free tier) ─────────────────────────
+google-generativeai==0.7.2
+
+# ── Numeric — cosine similarity search ────────────────────────────────────────
 numpy>=2.0.0
 
-# ── Utilities ──────────────────────────────────────────────────────────────────
+# ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1

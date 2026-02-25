@@ -1,8 +1,9 @@
 """
-qa_engine.py — Q&A using semantic retrieval + Gemini 2.0 Flash generation.
+qa_engine.py — Q&A using gemini-embedding-001 retrieval + Gemini 1.5 Flash generation.
 """
 
 import os
+import logging
 from typing import Dict, Any
 from pathlib import Path
 
@@ -10,8 +11,9 @@ import google.generativeai as genai
 
 from .indexer import CodebaseIndexer
 
-# Confirmed available via list_models() — use short name (SDK resolves it)
-GEMINI_MODEL = "gemini-2.5-flash"
+logger = logging.getLogger("codelens.qa")
+
+GEMINI_MODEL = "gemini-1.5-flash"   # confirmed free tier, matches health check
 
 
 class QAEngine:
@@ -33,6 +35,7 @@ class QAEngine:
 
         chunks = self.indexer.search(session_id, question, top_k=8)
         if not chunks:
+            logger.warning('"event":"no_chunks","session":"%s"', session_id)
             return {
                 "answer": (
                     "No relevant code found for your question. "
@@ -63,18 +66,20 @@ class QAEngine:
             "Respond in markdown format."
         )
 
-        client = genai.GenerativeModel(GEMINI_MODEL)
-        response = client.generate_content(
+        model    = genai.GenerativeModel(GEMINI_MODEL)
+        response = model.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.2, max_output_tokens=1500),
         )
         answer_text = response.text.strip()
+        logger.info('"event":"answer_generated","session":"%s","chunks":%d',
+                    session_id, len(chunks))
 
         refactor = None
         if generate_refactor and chunks:
             top = chunks[0]
-            r = client.generate_content(
+            r   = model.generate_content(
                 "You are a senior software engineer. "
                 "Review this code and give 3-5 concrete refactor suggestions.\n\n"
                 f"File: {top['file']} (lines {top['line_start']}-{top['line_end']})\n"
@@ -89,21 +94,22 @@ class QAEngine:
             refactor = r.text.strip()
 
         return {
-            "answer": answer_text,
-            "snippets": [{**c, "language": _lang(c["file"])} for c in chunks],
+            "answer":              answer_text,
+            "snippets":            [{**c, "language": _lang(c["file"])} for c in chunks],
             "refactor_suggestions": refactor,
         }
 
 
 def _lang(filename: str) -> str:
     ext_map = {
-        ".py": "python", ".js": "javascript", ".ts": "typescript",
-        ".jsx": "jsx", ".tsx": "tsx", ".java": "java", ".go": "go",
-        ".rb": "ruby", ".rs": "rust", ".cpp": "cpp", ".c": "c",
-        ".h": "c", ".hpp": "cpp", ".cs": "csharp", ".php": "php",
-        ".swift": "swift", ".kt": "kotlin", ".sh": "bash",
-        ".bash": "bash", ".yml": "yaml", ".yaml": "yaml",
-        ".toml": "toml", ".json": "json", ".sql": "sql",
-        ".html": "html", ".css": "css", ".md": "markdown",
+        ".py": "python",  ".js": "javascript", ".ts": "typescript",
+        ".jsx": "jsx",    ".tsx": "tsx",        ".java": "java",
+        ".go": "go",      ".rb": "ruby",        ".rs": "rust",
+        ".cpp": "cpp",    ".c": "c",            ".h": "c",
+        ".hpp": "cpp",    ".cs": "csharp",      ".php": "php",
+        ".swift": "swift",".kt": "kotlin",      ".sh": "bash",
+        ".bash": "bash",  ".yml": "yaml",       ".yaml": "yaml",
+        ".toml": "toml",  ".json": "json",      ".sql": "sql",
+        ".html": "html",  ".css": "css",        ".md": "markdown",
     }
     return ext_map.get(Path(filename).suffix.lower(), "text")

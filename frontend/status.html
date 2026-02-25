@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CodeLens — System Status</title>
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src https://fonts.gstatic.com; connect-src 'self';" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
@@ -12,7 +15,7 @@
 <body>
   <nav class="nav">
     <div class="nav-brand">
-      <a href="/" style="display:flex;align-items:center;gap:0.5rem;text-decoration:none;color:inherit">
+      <a href="/" style="display:flex;align-items:center;gap:.5rem;text-decoration:none;color:inherit">
         <span class="nav-logo">⟨/⟩</span>
         <span class="nav-name">CodeLens</span>
       </a>
@@ -27,121 +30,110 @@
       <h1 class="status-title">System Status</h1>
       <p class="status-subtitle">Real-time health of all services</p>
       <div class="status-overall" id="status-overall">
-        <span class="status-dot" id="overall-dot"></span>
+        <span class="status-dot dot-checking" id="overall-dot"></span>
         <span id="overall-text">Checking…</span>
       </div>
     </div>
 
     <div class="status-grid">
-      <!-- Backend -->
       <div class="status-card" id="card-backend">
         <div class="status-card-icon">🖥</div>
-        <div class="status-card-body">
-          <h3 class="status-card-title">Backend</h3>
-          <p class="status-card-sub">FastAPI application server</p>
-          <div class="status-card-badge" id="badge-backend">—</div>
-          <p class="status-card-msg" id="msg-backend">Checking…</p>
-        </div>
+        <h3 class="status-card-title">Backend</h3>
+        <p class="status-card-sub">FastAPI application server</p>
+        <span class="status-card-badge" id="badge-backend">—</span>
+        <p class="status-card-msg" id="msg-backend">Checking…</p>
       </div>
-
-      <!-- Database -->
       <div class="status-card" id="card-database">
         <div class="status-card-icon">🗄</div>
-        <div class="status-card-body">
-          <h3 class="status-card-title">Database</h3>
-          <p class="status-card-sub">SQLite persistence layer</p>
-          <div class="status-card-badge" id="badge-database">—</div>
-          <p class="status-card-msg" id="msg-database">Checking…</p>
-        </div>
+        <h3 class="status-card-title">Database</h3>
+        <p class="status-card-sub">SQLite persistence layer</p>
+        <span class="status-card-badge" id="badge-database">—</span>
+        <p class="status-card-msg" id="msg-database">Checking…</p>
       </div>
-
-      <!-- LLM -->
       <div class="status-card" id="card-llm">
         <div class="status-card-icon">🤖</div>
-        <div class="status-card-body">
-          <h3 class="status-card-title">LLM Connection</h3>
-          <p class="status-card-sub">Google Gemini API</p>
-          <div class="status-card-badge" id="badge-llm">—</div>
-          <p class="status-card-msg" id="msg-llm">Checking…</p>
-        </div>
+        <h3 class="status-card-title">LLM + Embeddings</h3>
+        <p class="status-card-sub">Google Gemini API</p>
+        <span class="status-card-badge" id="badge-llm">—</span>
+        <p class="status-card-msg" id="msg-llm">Checking…</p>
       </div>
     </div>
 
     <div class="status-meta">
-      <p>Last checked: <span id="last-checked">—</span></p>
-      <p>Response time: <span id="latency">—</span></p>
+      <span>Last checked: <span id="last-checked">—</span></span>
+      <span>Response time: <span id="latency">—</span></span>
       <button class="btn-ghost btn-sm" onclick="checkHealth()">Refresh ↺</button>
     </div>
 
     <div class="status-info-box">
-      <h3>About the Stack</h3>
+      <h3>Stack</h3>
       <div class="stack-items">
         <div class="stack-item">
-          <span class="stack-label">LLM Provider</span>
+          <span class="stack-label">LLM</span>
           <span class="stack-value">Google Gemini 1.5 Flash (free tier)</span>
         </div>
         <div class="stack-item">
           <span class="stack-label">Embeddings</span>
-          <span class="stack-value">sentence-transformers / all-MiniLM-L6-v2 (local, free)</span>
+          <span class="stack-value">Google gemini-embedding-001 (free tier, 768-dim)</span>
         </div>
         <div class="stack-item">
-          <span class="stack-label">Vector Store</span>
-          <span class="stack-value">FAISS (in-process, no external service)</span>
+          <span class="stack-label">Vector search</span>
+          <span class="stack-value">Numpy cosine similarity (in-process, no external service)</span>
         </div>
         <div class="stack-item">
           <span class="stack-label">Database</span>
-          <span class="stack-value">SQLite (file-based, zero-config)</span>
+          <span class="stack-value">SQLite — file-based, zero config</span>
         </div>
         <div class="stack-item">
           <span class="stack-label">Backend</span>
-          <span class="stack-value">Python 3.11 + FastAPI + Uvicorn</span>
+          <span class="stack-value">Python 3.x · FastAPI · Uvicorn · slowapi (rate limiting)</span>
+        </div>
+        <div class="stack-item">
+          <span class="stack-label">Security</span>
+          <span class="stack-value">DOMPurify (XSS) · CSP headers · zip-slip guard · rate limiting</span>
         </div>
       </div>
     </div>
   </main>
 
   <footer class="footer">
-    <span>CodeLens — Built with FastAPI, Gemini, FAISS &amp; ❤</span>
+    <span>CodeLens — Built with FastAPI &amp; Gemini</span>
     <a href="/" class="footer-link">Back to App</a>
   </footer>
 
   <script>
     async function checkHealth() {
       document.getElementById("overall-text").textContent = "Checking…";
-      document.getElementById("overall-dot").className = "status-dot dot-checking";
+      document.getElementById("overall-dot").className    = "status-dot dot-checking";
 
       try {
-        const res = await fetch("/api/health");
+        const res  = await fetch("/api/health");
         const data = await res.json();
 
-        // Overall
-        const overall = data.status === "ok";
-        document.getElementById("overall-dot").className = `status-dot ${overall ? "dot-ok" : "dot-error"}`;
-        document.getElementById("overall-text").textContent = overall ? "All systems operational" : "Some services degraded";
-        document.getElementById("last-checked").textContent = new Date(data.timestamp).toLocaleString();
-        document.getElementById("latency").textContent = `${data.latency_ms} ms`;
+        const ok = data.status === "ok";
+        document.getElementById("overall-dot").className =
+          ok ? "status-dot dot-ok" : "status-dot dot-error";
+        document.getElementById("overall-text").textContent =
+          ok ? "All systems operational" : "Some services degraded";
+        document.getElementById("last-checked").textContent =
+          new Date(data.timestamp).toLocaleString();
+        document.getElementById("latency").textContent = data.latency_ms + " ms";
 
-        // Individual services
-        const services = {
-          backend: data.services.backend,
-          database: data.services.database,
-          llm: data.services.llm,
-        };
-
-        for (const [key, svc] of Object.entries(services)) {
-          const badge = document.getElementById(`badge-${key}`);
-          const msg = document.getElementById(`msg-${key}`);
-          const card = document.getElementById(`card-${key}`);
-
+        for (const [key, svc] of Object.entries(data.services || {})) {
+          const badge = document.getElementById("badge-" + key);
+          const msg   = document.getElementById("msg-"   + key);
+          const card  = document.getElementById("card-"  + key);
+          if (!badge) continue;
           const isOk = svc.status === "ok";
           badge.textContent = isOk ? "Operational" : "Error";
-          badge.className = `status-card-badge ${isOk ? "badge-ok" : "badge-error"}`;
-          msg.textContent = svc.message;
-          card.className = `status-card ${isOk ? "" : "card-error"}`;
+          badge.className   = "status-card-badge " + (isOk ? "badge-ok" : "badge-error");
+          // textContent — never innerHTML — for API-supplied strings
+          msg.textContent   = svc.message || "";
+          card.classList.toggle("card-error", !isOk);
         }
-      } catch (e) {
+      } catch (_) {
         document.getElementById("overall-dot").className = "status-dot dot-error";
-        document.getElementById("overall-text").textContent = "Unable to reach backend";
+        document.getElementById("overall-text").textContent = "Cannot reach backend";
       }
     }
 

@@ -1,5 +1,14 @@
 "use strict";
 
+/*
+ * app.js — CodeLens frontend
+ *
+ * Security: All user-controlled or LLM-generated content is sanitised
+ * with DOMPurify before being inserted via innerHTML. Direct string
+ * interpolation into innerHTML is never used for untrusted data —
+ * untrusted values go through the esc() helper or DOM APIs only.
+ */
+
 // ── State ─────────────────────────────────────────────────────────────────────
 const state = {
   sessionId:   null,
@@ -11,6 +20,39 @@ const state = {
 function el(id)   { return document.getElementById(id); }
 function show(id) { const e = el(id); if (e) e.classList.remove("hidden"); }
 function hide(id) { const e = el(id); if (e) e.classList.add("hidden"); }
+
+/** Escape a value for safe inclusion in HTML text nodes. */
+function esc(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
+/**
+ * Safely render Markdown. DOMPurify strips any scripts or event
+ * handlers that a malicious LLM response or injected snippet might contain.
+ */
+function safeMarkdown(md) {
+  const raw = marked.parse(md || "");
+  return DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: [
+      "p","br","strong","em","code","pre","h1","h2","h3","h4",
+      "ul","ol","li","blockquote","a","hr","table","thead","tbody",
+      "tr","th","td","span","div",
+    ],
+    ALLOWED_ATTR: ["href","class","target","rel"],
+    FORCE_BODY: true,
+  });
+}
+
+/** Set text content safely — never innerHTML. */
+function setText(id, value) {
+  const e = el(id);
+  if (e) e.textContent = String(value ?? "");
+}
 
 function showToast(msg, isError = true) {
   const t = document.createElement("div");
@@ -69,28 +111,20 @@ function initDropzone() {
   const input = el("file-input");
   if (!zone || !input) return;
 
-  // Click on zone (but NOT on the browse span — that calls input.click() directly)
   zone.addEventListener("click", (e) => {
-    // If click came from the .file-label span, let that span handle it
     if (e.target.classList.contains("file-label")) return;
     input.click();
   });
-
-  zone.addEventListener("dragover", e => {
-    e.preventDefault();
-    zone.classList.add("drag-over");
-  });
-  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+  zone.addEventListener("dragover",  e => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", ()  => zone.classList.remove("drag-over"));
   zone.addEventListener("drop", e => {
     e.preventDefault();
     zone.classList.remove("drag-over");
     const file = e.dataTransfer.files[0];
     if (file) uploadZip(file);
   });
-
   input.addEventListener("change", () => {
-    if (input.files && input.files[0]) uploadZip(input.files[0]);
-    // Reset so same file can be re-selected
+    if (input.files?.[0]) uploadZip(input.files[0]);
     input.value = "";
   });
 }
@@ -101,12 +135,10 @@ async function uploadZip(file) {
     showToast("Please upload a .zip file.");
     return;
   }
-
   setProgress(5);
-  el("status-text").textContent = "Uploading and indexing codebase…";
+  setText("status-text", "Uploading and indexing codebase…");
   show("ingest-status");
   hide("ingest-success");
-
   animateProgress(5, 75, 4000);
 
   const formData = new FormData();
@@ -116,7 +148,6 @@ async function uploadZip(file) {
     const res = await fetch("/api/upload", { method: "POST", body: formData });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || "Upload failed");
-
     setProgress(100);
     await delay(400);
     onIngestSuccess(data);
@@ -132,10 +163,9 @@ async function loadGithub() {
   if (!url) { showToast("Please enter a GitHub URL."); return; }
 
   setProgress(5);
-  el("status-text").textContent = "Fetching repo from GitHub…";
+  setText("status-text", "Fetching repo from GitHub…");
   show("ingest-status");
   hide("ingest-success");
-
   animateProgress(5, 65, 6000);
 
   try {
@@ -158,9 +188,10 @@ function onIngestSuccess(data) {
   localStorage.setItem("codelens_session", state.sessionId);
 
   const s = data.stats || {};
-  el("success-source").textContent = data.source || "codebase";
-  el("success-stats").textContent  =
-    `${s.files_indexed || 0} files · ${s.total_chunks || 0} chunks · ${s.files_skipped || 0} skipped`;
+  // Use textContent — never innerHTML — for user/API-supplied strings
+  setText("success-source", data.source || "codebase");
+  setText("success-stats",
+    `${s.files_indexed ?? 0} files · ${s.total_chunks ?? 0} chunks · ${s.files_skipped ?? 0} skipped`);
 
   hide("ingest-status");
   show("ingest-success");
@@ -174,39 +205,24 @@ function onIngestSuccess(data) {
   show("panel-ask");
   show("panel-history");
   loadHistory();
-
-  setTimeout(() => {
-    el("panel-ask")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 250);
+  setTimeout(() => el("panel-ask")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
 }
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 function resetSession() {
-  state.sessionId   = null;
-  state.currentQaId = null;
+  state.sessionId = state.currentQaId = null;
   state.currentTags = [];
   localStorage.removeItem("codelens_session");
-
-  hide("ingest-success");
-  hide("ingest-status");
-  hide("panel-ask");
-  hide("panel-answer");
-  hide("panel-history");
-  hide("nav-session-badge");
-
-  const fi = el("file-input");
-  if (fi) fi.value = "";
-  const gu = el("github-url");
-  if (gu) gu.value = "";
+  ["ingest-success","ingest-status","panel-ask","panel-answer","panel-history","nav-session-badge"]
+    .forEach(hide);
+  const fi = el("file-input"); if (fi) fi.value = "";
+  const gu = el("github-url"); if (gu) gu.value = "";
 }
 
 // ── Ask ───────────────────────────────────────────────────────────────────────
 function initAsk() {
-  const btn = el("btn-ask");
-  if (btn) btn.addEventListener("click", askQuestion);
-
-  const qa = el("question-input");
-  if (qa) qa.addEventListener("keydown", e => {
+  el("btn-ask")?.addEventListener("click", askQuestion);
+  el("question-input")?.addEventListener("keydown", e => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) askQuestion();
   });
 }
@@ -218,12 +234,11 @@ function fillQuestion(btn) {
 
 async function askQuestion() {
   const question = (el("question-input")?.value || "").trim();
-  if (!question)         { showToast("Please type a question.");           return; }
-  if (!state.sessionId)  { showToast("Please upload a codebase first.");   return; }
+  if (!question)        { showToast("Please type a question.");          return; }
+  if (!state.sessionId) { showToast("Please upload a codebase first.");  return; }
 
-  const btn     = el("btn-ask");
+  const btn      = el("btn-ask");
   const refactor = el("refactor-toggle")?.checked || false;
-
   if (btn) btn.disabled = true;
   hide("ask-btn-text");
   show("ask-spinner");
@@ -231,11 +246,7 @@ async function askQuestion() {
   try {
     const data = await apiFetch("/api/ask", {
       method: "POST",
-      body: JSON.stringify({
-        session_id:        state.sessionId,
-        question,
-        generate_refactor: refactor,
-      }),
+      body: JSON.stringify({ session_id: state.sessionId, question, generate_refactor: refactor }),
     });
     renderAnswer(question, data);
     loadHistory();
@@ -253,20 +264,19 @@ function renderAnswer(question, data) {
   state.currentQaId = data.qa_id || null;
   state.currentTags = [];
 
-  const ql = el("answer-question-label");
-  if (ql) ql.textContent = `"${question}"`;
+  // Safe: textContent only
+  setText("answer-question-label", `"${question}"`);
 
+  // Safe: DOMPurify-sanitised markdown
   const ac = el("answer-content");
   if (ac) {
-    ac.innerHTML = marked.parse(data.answer || "No answer returned.");
+    ac.innerHTML = safeMarkdown(data.answer);
     ac.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
   }
 
-  // Snippets
   const snippets = data.snippets || [];
   if (snippets.length) {
-    const sc = el("snippets-count");
-    if (sc) sc.textContent = `${snippets.length} chunk${snippets.length !== 1 ? "s" : ""}`;
+    setText("snippets-count", `${snippets.length} chunk${snippets.length !== 1 ? "s" : ""}`);
     const sl = el("snippets-list");
     if (sl) {
       sl.innerHTML = "";
@@ -277,11 +287,11 @@ function renderAnswer(question, data) {
     hide("snippets-section");
   }
 
-  // Refactor
   if (data.refactor_suggestions) {
     const rc = el("refactor-content");
     if (rc) {
-      rc.innerHTML = marked.parse(data.refactor_suggestions);
+      // Sanitise LLM refactor output too
+      rc.innerHTML = safeMarkdown(data.refactor_suggestions);
       rc.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
     }
     show("refactor-section");
@@ -289,44 +299,56 @@ function renderAnswer(question, data) {
     hide("refactor-section");
   }
 
-  // Tags
   renderTags([]);
   show("tags-row");
   show("panel-answer");
-
-  setTimeout(() => {
-    el("panel-answer")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 100);
+  setTimeout(() => el("panel-answer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 }
 
 function renderSnippet(s, idx, container) {
   const score = Math.round((s.score || 0) * 100);
   const lang  = s.language || "text";
 
-  const card = document.createElement("div");
+  // Build card using DOM APIs — no interpolation of untrusted data into innerHTML
+  const card   = document.createElement("div");
   card.className = "snippet-card" + (idx < 2 ? " open" : "");
-  card.innerHTML = `
-    <div class="snippet-header">
-      <span class="snippet-score">${score}%</span>
-      <span class="snippet-file">${esc(s.file)}</span>
-      <span class="snippet-lines">lines ${s.line_start}–${s.line_end}</span>
-      <span class="snippet-toggle">▾</span>
-    </div>
-    <div class="snippet-body">
-      <pre><code class="language-${lang}">${esc(s.raw || "")}</code></pre>
-    </div>
-  `;
-  card.querySelector(".snippet-header").addEventListener("click", () => {
-    card.classList.toggle("open");
-  });
-  card.querySelectorAll("pre code").forEach(b => hljs.highlightElement(b));
-  container.appendChild(card);
-}
 
-function esc(str) {
-  return String(str)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const header = document.createElement("div");
+  header.className = "snippet-header";
+
+  const scoreEl = document.createElement("span");
+  scoreEl.className = "snippet-score";
+  scoreEl.textContent = `${score}%`;            // numeric — safe
+
+  const fileEl = document.createElement("span");
+  fileEl.className = "snippet-file";
+  fileEl.textContent = s.file;                  // textContent — XSS-safe
+
+  const linesEl = document.createElement("span");
+  linesEl.className = "snippet-lines";
+  linesEl.textContent = `lines ${s.line_start}–${s.line_end}`;  // numeric — safe
+
+  const toggleEl = document.createElement("span");
+  toggleEl.className = "snippet-toggle";
+  toggleEl.textContent = "▾";
+
+  header.append(scoreEl, fileEl, linesEl, toggleEl);
+  header.addEventListener("click", () => card.classList.toggle("open"));
+
+  const body = document.createElement("div");
+  body.className = "snippet-body";
+
+  const pre  = document.createElement("pre");
+  const code = document.createElement("code");
+  code.className = `language-${lang}`;
+  code.textContent = s.raw || "";               // textContent — XSS-safe
+
+  pre.appendChild(code);
+  body.appendChild(pre);
+  card.append(header, body);
+
+  hljs.highlightElement(code);
+  container.appendChild(card);
 }
 
 // ── Tags ──────────────────────────────────────────────────────────────────────
@@ -334,11 +356,19 @@ function renderTags(tags) {
   state.currentTags = [...tags];
   const c = el("tags-container");
   if (!c) return;
-  c.innerHTML = "";
+  // Clear and rebuild using DOM APIs — no innerHTML with tag text
+  while (c.firstChild) c.removeChild(c.firstChild);
   tags.forEach(tag => {
     const pill = document.createElement("span");
     pill.className = "tag-pill";
-    pill.innerHTML = `${esc(tag)} <button onclick="removeTag('${esc(tag)}')" title="Remove">×</button>`;
+
+    const text = document.createTextNode(tag + " ");
+    const btn  = document.createElement("button");
+    btn.textContent = "×";
+    btn.title = "Remove";
+    btn.addEventListener("click", () => removeTag(tag));
+
+    pill.append(text, btn);
     c.appendChild(pill);
   });
 }
@@ -346,7 +376,7 @@ function renderTags(tags) {
 function addTag() {
   const input = el("tag-input");
   if (!input) return;
-  const val = input.value.trim().toLowerCase().replace(/\s+/g, "-");
+  const val = input.value.trim().toLowerCase().replace(/\s+/g, "-").slice(0, 32);
   if (!val || state.currentTags.includes(val)) { input.value = ""; return; }
   state.currentTags.push(val);
   renderTags(state.currentTags);
@@ -395,25 +425,52 @@ async function loadHistory(query = "") {
 function renderHistory(records) {
   const list = el("history-list");
   if (!list) return;
-  if (!records || !records.length) {
-    list.innerHTML = `<div class="history-empty">No Q&As yet. Ask your first question above!</div>`;
+
+  while (list.firstChild) list.removeChild(list.firstChild);
+
+  if (!records?.length) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No Q&As yet. Ask your first question above!";
+    list.appendChild(empty);
     return;
   }
-  list.innerHTML = "";
+
   records.forEach(rec => {
-    const item = document.createElement("div");
+    const item  = document.createElement("div");
     item.className = "history-item";
-    const tags  = (rec.tags || []).map(t => `<span class="history-tag">${esc(t)}</span>`).join("");
+
+    // Question — textContent only
+    const q = document.createElement("div");
+    q.className = "history-item-q";
+    q.textContent = rec.question;
+
+    // Meta
+    const meta = document.createElement("div");
+    meta.className = "history-item-meta";
     const date  = (rec.created_at || "").slice(0, 16).replace("T", " ");
     const count = (rec.snippets || []).length;
-    item.innerHTML = `
-      <div class="history-item-q">${esc(rec.question)}</div>
-      <div class="history-item-meta">
-        <span>${date} UTC</span>
-        <span>${count} snippet${count !== 1 ? "s" : ""}</span>
-      </div>
-      ${tags ? `<div class="history-item-tags">${tags}</div>` : ""}
-    `;
+    const dateSpan = document.createElement("span");
+    dateSpan.textContent = `${date} UTC`;
+    const countSpan = document.createElement("span");
+    countSpan.textContent = `${count} snippet${count !== 1 ? "s" : ""}`;
+    meta.append(dateSpan, countSpan);
+
+    item.append(q, meta);
+
+    // Tags — textContent only
+    if (rec.tags?.length) {
+      const tagRow = document.createElement("div");
+      tagRow.className = "history-item-tags";
+      rec.tags.forEach(t => {
+        const span = document.createElement("span");
+        span.className = "history-tag";
+        span.textContent = t;
+        tagRow.appendChild(span);
+      });
+      item.appendChild(tagRow);
+    }
+
     item.addEventListener("click", () => {
       el("question-input").value = rec.question;
       renderAnswer(rec.question, rec);
@@ -434,7 +491,7 @@ function exportSession() {
   window.open(`/api/export/${state.sessionId}`, "_blank");
 }
 
-// ── Restore session from localStorage ────────────────────────────────────────
+// ── Session restore ───────────────────────────────────────────────────────────
 async function restoreSession() {
   const saved = localStorage.getItem("codelens_session");
   if (!saved) return;
@@ -442,10 +499,9 @@ async function restoreSession() {
     const session = await apiFetch(`/api/sessions/${saved}`);
     state.sessionId = saved;
 
-    el("success-source").textContent = session.source || "Previous session";
+    setText("success-source", session.source || "Previous session");
     const s = session.stats || {};
-    el("success-stats").textContent =
-      `${s.files_indexed || 0} files · ${s.total_chunks || 0} chunks`;
+    setText("success-stats", `${s.files_indexed ?? 0} files · ${s.total_chunks ?? 0} chunks`);
 
     show("ingest-success");
     show("panel-ask");
@@ -462,7 +518,7 @@ async function restoreSession() {
   }
 }
 
-// ── Progress bar helpers ──────────────────────────────────────────────────────
+// ── Progress helpers ──────────────────────────────────────────────────────────
 function setProgress(pct) {
   const bar = el("progress-bar");
   if (bar) bar.style.width = pct + "%";
@@ -471,10 +527,8 @@ function setProgress(pct) {
 let _progTimer;
 function animateProgress(from, to, durationMs) {
   clearInterval(_progTimer);
-  const steps     = 40;
-  const interval  = durationMs / steps;
-  const increment = (to - from) / steps;
-  let current     = from;
+  const steps = 40, interval = durationMs / steps, increment = (to - from) / steps;
+  let current = from;
   setProgress(current);
   _progTimer = setInterval(() => {
     current += increment;
