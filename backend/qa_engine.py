@@ -1,10 +1,5 @@
 """
-qa_engine.py — Q&A using gemini-embedding-001 retrieval + Gemini Flash generation.
-
-Model name format for google-generativeai 0.8.3:
-  SDK 0.8.x uses v1beta API. Correct model string is "models/gemini-1.5-flash"
-  with the "models/" prefix, OR use the new stable name "gemini-1.5-flash-latest".
-  Confirmed working names for 0.8.x: "gemini-1.5-flash-latest", "gemini-1.5-pro-latest"
+qa_engine.py — Q&A using gemini-embedding-001 retrieval + Gemini 2.5 Flash generation.
 """
 
 import os
@@ -18,8 +13,7 @@ from .indexer import CodebaseIndexer
 
 logger = logging.getLogger("codelens.qa")
 
-# "gemini-1.5-flash-latest" resolves correctly in SDK 0.8.x / v1beta API
-GEMINI_MODEL = "gemini-1.5-flash-latest"
+GEMINI_MODEL = "gemini-2.5-flash"   # confirmed working on this API key
 
 
 class QAEngine:
