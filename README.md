@@ -2,8 +2,8 @@
 
 > Upload any codebase. Ask questions in plain English. Get answers with exact file paths, line numbers, and code snippets.
 
-**Live demo**: [your-deployment-url]  
-**GitHub**: [your-repo-url]
+**Live demo**: [https://codelens-wx1d.onrender.com]  
+**GitHub**: [https://github.com/likhith0410/codelens]
 
 ---
 
